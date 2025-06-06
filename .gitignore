@@ -134,3 +134,31 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Project specific
+# Google Apps Script
+*.clasp.json
+.clasp.json
+
+# Spreadsheet IDs
+spreadsheet-ids.json
+*spreadsheet-ids*.json
+
+# API Keys and Tokens
+*api-keys*.json
+*tokens*.json
+*credentials*.json
+
+# Local configuration
+config.local.json
+*config.local*.json
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
