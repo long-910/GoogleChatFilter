@@ -114,7 +114,7 @@ app.get('/api/settings', (req, res) => {
     const envContent = fs.readFileSync(envPath, 'utf8');
     
     const settings = {
-      accessToken: process.env.ACCESS_TOKEN || '',
+      accessToken: process.env.BOT_WEBHOOK_URL || '',
       webhookUrl: process.env.BOT_WEBHOOK_URL || ''
     };
     
@@ -129,8 +129,8 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     const { token, webhookUrl } = req.body;
-    if (!webhookUrl) {
-      throw new Error('Webhook URLが指定されていません');
+    if (!token || !webhookUrl) {
+      throw new Error('必要な設定が不足しています');
     }
 
     // 設定を.envファイルに保存
@@ -140,8 +140,7 @@ app.post('/api/settings', (req, res) => {
     
     // 既存の設定を更新または追加
     const settings = {
-      BOT_WEBHOOK_URL: webhookUrl,
-      ACCESS_TOKEN: token || ''
+      BOT_WEBHOOK_URL: webhookUrl
     };
     
     Object.entries(settings).forEach(([key, value]) => {
@@ -156,7 +155,6 @@ app.post('/api/settings', (req, res) => {
     
     // 環境変数を更新
     process.env.BOT_WEBHOOK_URL = webhookUrl;
-    process.env.ACCESS_TOKEN = token || '';
     
     res.json({ success: true, message: '設定を保存しました' });
   } catch (error) {
@@ -179,29 +177,21 @@ app.post('/webhook', async (req, res) => {
     const authHeader = req.headers.authorization;
     console.log('Authorization Header:', authHeader);
 
-    // アクセストークンが設定されている場合のみ認証をチェック
-    if (process.env.ACCESS_TOKEN) {
-      if (!authHeader) {
-        throw new Error("認証トークンが指定されていません");
-      }
+    if (!authHeader) {
+      throw new Error("認証トークンが指定されていません");
+    }
 
-      if (!authHeader.startsWith('Bearer ')) {
-        throw new Error("認証トークンの形式が不正です");
-      }
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new Error("認証トークンの形式が不正です");
+    }
 
-      // Base64デコード
-      const encodedToken = authHeader.split(' ')[1];
-      let token;
-      try {
-        token = Buffer.from(encodedToken, 'base64').toString('utf-8');
-      } catch (error) {
-        throw new Error("認証トークンのデコードに失敗しました");
-      }
-
-      // トークンの検証
-      if (token !== process.env.ACCESS_TOKEN) {
-        throw new Error("認証トークンが一致しません");
-      }
+    // Base64デコード
+    const encodedToken = authHeader.split(' ')[1];
+    let token;
+    try {
+      token = Buffer.from(encodedToken, 'base64').toString('utf-8');
+    } catch (error) {
+      throw new Error("認証トークンのデコードに失敗しました");
     }
 
     console.log('Decoded Token:', token ? '存在します' : '存在しません');
@@ -210,13 +200,13 @@ app.post('/webhook', async (req, res) => {
       text: text,
       "送信先": "GAS Bot",
       "URL": process.env.BOT_WEBHOOK_URL,
-      "認証": process.env.ACCESS_TOKEN ? "Bearer認証を使用" : "認証なし"
+      "認証": "Bearer認証を使用"
     });
 
     // GASのBotに転送（トークンをヘッダーに含める）
     const response = await axios.post(process.env.BOT_WEBHOOK_URL, { text }, {
       headers: {
-        'Authorization': process.env.ACCESS_TOKEN ? `Bearer ${Buffer.from(process.env.ACCESS_TOKEN).toString('base64')}` : undefined,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
