@@ -1,7 +1,7 @@
 {
-  "name": "google-chat-filter",
+  "name": "chat-filter",
   "version": "1.0.0",
-  "description": "Google Chat Filter with Web Interface",
+  "description": "Chat Filter with Web Interface",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
