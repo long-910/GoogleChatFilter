@@ -41,6 +41,9 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header h1 {
@@ -92,19 +95,22 @@
             font-size: 14px;
         }
 
-        textarea {
+        textarea, input[type="text"], input[type="password"], input[type="url"] {
             width: 100%;
-            height: 120px;
             padding: 12px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            resize: vertical;
             font-family: inherit;
             font-size: 14px;
             transition: border-color 0.2s;
         }
 
-        textarea:focus {
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        textarea:focus, input:focus {
             outline: none;
             border-color: var(--primary-color);
         }
@@ -202,6 +208,22 @@
             box-shadow: 0 0 8px var(--error-color);
         }
 
+        .settings-panel {
+            display: none;
+        }
+
+        .settings-panel.active {
+            display: block;
+        }
+
+        .main-panel.active {
+            display: grid;
+        }
+
+        .main-panel {
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 grid-template-columns: 1fr;
@@ -212,11 +234,37 @@
 <body>
     <div class="app-container">
         <header class="header">
-            <h1>Google Chat Filter</h1>
-            <p>メッセージを送信し、リアルタイムでログを確認できます。</p>
+            <div>
+                <h1>Google Chat Filter</h1>
+                <p>メッセージを送信し、リアルタイムでログを確認できます。</p>
+            </div>
+            <button class="secondary-button" onclick="toggleSettings()">設定</button>
         </header>
 
-        <div class="main-container">
+        <div class="settings-panel" id="settingsPanel">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>設定</h2>
+                </div>
+                <form id="settingsForm">
+                    <div class="input-group">
+                        <label for="accessToken">アクセストークン</label>
+                        <input type="password" id="accessToken" name="accessToken" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="webhookUrl">Bot Webhook URL</label>
+                        <input type="url" id="webhookUrl" name="webhookUrl" required>
+                        <div class="form-text">Google Chat BotのWebhook URLを入力してください</div>
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="primary-button">保存</button>
+                        <button type="button" class="secondary-button" onclick="toggleSettings()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="main-panel active" id="mainPanel">
             <div class="panel">
                 <div class="panel-header">
                     <h2>メッセージ送信</h2>
@@ -246,7 +294,106 @@
         const logContainer = document.getElementById('logContainer');
         const messageInput = document.getElementById('messageInput');
         const connectionStatus = document.getElementById('connectionStatus');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const mainPanel = document.getElementById('mainPanel');
         let ws;
+
+        function toggleSettings() {
+            settingsPanel.classList.toggle('active');
+            mainPanel.classList.toggle('active');
+            if (settingsPanel.classList.contains('active')) {
+                loadCurrentSettings();
+            }
+        }
+
+        async function loadCurrentSettings() {
+            try {
+                // ローカルストレージから設定を読み込む
+                const savedToken = localStorage.getItem('accessToken');
+                const savedWebhookUrl = localStorage.getItem('webhookUrl');
+                
+                if (savedToken) {
+                    document.getElementById('accessToken').value = savedToken;
+                }
+                if (savedWebhookUrl) {
+                    document.getElementById('webhookUrl').value = savedWebhookUrl;
+                }
+
+                // サーバーから設定を読み込む（バックアップとして）
+                const response = await fetch('/api/settings');
+                if (response.ok) {
+                    const settings = await response.json();
+                    if (!savedToken && settings.accessToken) {
+                        document.getElementById('accessToken').value = settings.accessToken;
+                        localStorage.setItem('accessToken', settings.accessToken);
+                    }
+                    if (!savedWebhookUrl && settings.webhookUrl) {
+                        document.getElementById('webhookUrl').value = settings.webhookUrl;
+                        localStorage.setItem('webhookUrl', settings.webhookUrl);
+                    }
+                }
+            } catch (error) {
+                console.error('設定の読み込みに失敗:', error);
+                addLogEntry({
+                    type: 'error',
+                    message: '設定の読み込みに失敗しました',
+                    details: { error: error.message }
+                });
+            }
+        }
+
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = document.getElementById('accessToken').value.trim();
+            const webhookUrl = document.getElementById('webhookUrl').value.trim();
+            
+            if (!token) {
+                addLogEntry({
+                    type: 'error',
+                    message: 'アクセストークンを入力してください'
+                });
+                return;
+            }
+
+            if (!webhookUrl) {
+                addLogEntry({
+                    type: 'error',
+                    message: 'Webhook URLを入力してください'
+                });
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ token, webhookUrl }),
+                });
+                
+                if (response.ok) {
+                    // 設定をローカルストレージに保存
+                    localStorage.setItem('accessToken', token);
+                    localStorage.setItem('webhookUrl', webhookUrl);
+                    
+                    addLogEntry({
+                        type: 'success',
+                        message: '設定を保存しました'
+                    });
+                    toggleSettings();
+                } else {
+                    throw new Error('設定の保存に失敗しました');
+                }
+            } catch (error) {
+                console.error('設定の保存に失敗:', error);
+                addLogEntry({
+                    type: 'error',
+                    message: '設定の保存に失敗しました',
+                    details: { error: error.message }
+                });
+            }
+        });
 
         function connectWebSocket() {
             ws = new WebSocket(`ws://${window.location.host}/ws`);
@@ -303,12 +450,29 @@
             const text = messageInput.value.trim();
             if (!text) return;
 
+            const token = localStorage.getItem('accessToken');
+            console.log('Stored Token:', token ? '存在します' : '存在しません');
+
+            if (!token) {
+                addLogEntry({
+                    type: 'error',
+                    message: 'アクセストークンが設定されていません。設定画面でトークンを設定してください。'
+                });
+                return;
+            }
+
             try {
+                // トークンをBase64エンコード
+                const encodedToken = btoa(token);
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${encodedToken}`
+                };
+                console.log('Request Headers:', headers);
+
                 const response = await fetch('/webhook', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: headers,
                     body: JSON.stringify({ text })
                 });
 

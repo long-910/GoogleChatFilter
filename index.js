@@ -101,6 +101,68 @@ app.get('/', (req, res) => {
   res.render('index');
 });
 
+// 設定ページの表示
+app.get('/settings', (req, res) => {
+  res.render('settings');
+});
+
+// 現在の設定を取得
+app.get('/api/settings', (req, res) => {
+  try {
+    const fs = require('fs');
+    const envPath = '.env';
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    
+    const settings = {
+      accessToken: process.env.BOT_WEBHOOK_URL || '',
+      webhookUrl: process.env.BOT_WEBHOOK_URL || ''
+    };
+    
+    res.json(settings);
+  } catch (error) {
+    console.error('設定の読み込みに失敗:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 設定の保存
+app.post('/api/settings', (req, res) => {
+  try {
+    const { token, webhookUrl } = req.body;
+    if (!token || !webhookUrl) {
+      throw new Error('必要な設定が不足しています');
+    }
+
+    // 設定を.envファイルに保存
+    const fs = require('fs');
+    const envPath = '.env';
+    let envContent = fs.readFileSync(envPath, 'utf8');
+    
+    // 既存の設定を更新または追加
+    const settings = {
+      BOT_WEBHOOK_URL: webhookUrl
+    };
+    
+    Object.entries(settings).forEach(([key, value]) => {
+      if (envContent.includes(`${key}=`)) {
+        envContent = envContent.replace(new RegExp(`${key}=.*`), `${key}=${value}`);
+      } else {
+        envContent += `\n${key}=${value}`;
+      }
+    });
+    
+    fs.writeFileSync(envPath, envContent);
+    
+    // 環境変数を更新
+    process.env.BOT_WEBHOOK_URL = webhookUrl;
+    
+    res.json({ success: true, message: '設定を保存しました' });
+  } catch (error) {
+    console.error('設定の保存に失敗:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Webhook受信エンドポイント
 app.post('/webhook', async (req, res) => {
   try {
@@ -111,14 +173,43 @@ app.post('/webhook', async (req, res) => {
       throw new Error("テキストが指定されていません");
     }
 
+    // Authorizationヘッダーからトークンを取得
+    const authHeader = req.headers.authorization;
+    console.log('Authorization Header:', authHeader);
+
+    if (!authHeader) {
+      throw new Error("認証トークンが指定されていません");
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new Error("認証トークンの形式が不正です");
+    }
+
+    // Base64デコード
+    const encodedToken = authHeader.split(' ')[1];
+    let token;
+    try {
+      token = Buffer.from(encodedToken, 'base64').toString('utf-8');
+    } catch (error) {
+      throw new Error("認証トークンのデコードに失敗しました");
+    }
+
+    console.log('Decoded Token:', token ? '存在します' : '存在しません');
+
     logProcessing("メッセージの処理を開始", {
       text: text,
       "送信先": "GAS Bot",
-      "URL": process.env.BOT_WEBHOOK_URL
+      "URL": process.env.BOT_WEBHOOK_URL,
+      "認証": "Bearer認証を使用"
     });
 
-    // GASのBotに転送
-    const response = await axios.post(process.env.BOT_WEBHOOK_URL, { text });
+    // GASのBotに転送（トークンをヘッダーに含める）
+    const response = await axios.post(process.env.BOT_WEBHOOK_URL, { text }, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     
     logResponse("処理結果", {
       status: "成功",

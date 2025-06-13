@@ -151,7 +151,7 @@ Web インターフェースでは以下の機能が利用できます：
    - 値: あなたのスプレッドシート ID
 3. `Code.gs` に以下のコードを貼り付けます。
 
-https://github.com/long-910/GoogleChatFilter/blob/08f03338dd9e9dab3916768a2757fa8f4664c7f7/Code.gs
+https://github.com/long-910/GoogleChatFilter/blob/main/Code.gs
 
 ### 2-3. デプロイ
 
@@ -325,7 +325,6 @@ curl -X POST http://localhost:3000/webhook \
    - アプリの権限が正しく設定されているか確認
 
 3. Google Apps Script の場合：
-
    - デプロイが正しく行われているか確認
    - デプロイ URL が正しいか確認
    - アクセス権限が「全員」に設定されているか確認
@@ -333,7 +332,12 @@ curl -X POST http://localhost:3000/webhook \
 4. スプレッドシートの場合：
    - スプレッドシート ID が正しいか確認
    - スプレッドシートへのアクセス権限が正しく設定されているか確認
-   - シート名が「フィルター設定」と「チャネル設定」で正しいか確認
+
+### 注意事項
+
+- スプレッドシートの設定を変更することで、フィルタールールを動的に更新できます。
+- Google Chat の Webhook 機能は Google Workspace の有料ユーザーのみ利用可能です。
+- Slack の Webhook は無料プランでも利用可能です。
 
 ---
 
